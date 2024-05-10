@@ -1,0 +1,8 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+logs/*
+.env
+.~lock.Разбор портов ТТК.xlsx#
+Разбор портов ТТК.xlsx
