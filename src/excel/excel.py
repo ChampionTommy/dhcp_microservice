@@ -1,30 +1,23 @@
-import pandas as pd
+from openpyxl import load_workbook
+import logging
 
 class ExcelProcessor:
     def __init__(self, file_path):
         self.file_path = file_path
-
+        self.workbook = load_workbook(filename=file_path)
+        logging.basicConfig(level=logging.INFO)
+    
     def read_sheet(self, sheet_name):
         try:
-            df = pd.read_excel(self.file_path, sheet_name=sheet_name)
-            df = df[df.iloc[:, 13].isnull()]  # Фильтруем строки, где в 14-ом столбце (индекс 13) значение None
-            df = df.sort_values(by=df.columns[1])  # Сортируем по второму столбцу (индекс 1)
-            return df.values.tolist()  # Возвращаем список строк
-        except FileNotFoundError:
-            print(f"Файл '{self.file_path}' не найден.")
+            sheet = self.workbook[sheet_name]
+            rows = list(sheet.values)
+            rows.sort(key=lambda row: str(row[1]) if len(row) > 1 and row[1] is not None else str(row[0]) if row else '')
+            return rows
+        except KeyError:
+            logging.error(f"Лист '{sheet_name}' не найден.")
             return []
-        except ValueError:
-            print(f"Лист '{sheet_name}' не найден.")
+        except Exception as e:
+            logging.error(f"Произошла ошибка при чтении листа '{sheet_name}': {e}")
             return []
 
-    def delete_row(self, sheet_name, index):
-        try:
-            df = pd.read_excel(self.file_path, sheet_name=sheet_name)
-            df = df.drop(index)  # Удаляем строку по индексу
-            df.to_excel(self.file_path, sheet_name=sheet_name, index=False)  # Записываем обратно в Excel файл
-            print(f"Строка с индексом {index} успешно удалена из листа '{sheet_name}'.")
-        except FileNotFoundError:
-            print(f"Файл '{self.file_path}' не найден.")
-        except ValueError:
-            print(f"Лист '{sheet_name}' не найден.")
-        
+
