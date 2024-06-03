@@ -3,36 +3,34 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from src.excel import ExcelProcessor
 from src.errors import ColorizedErrors
-import logging
-
-class WebParser:
-    def __init__(self, url, file_path):
+class WebParser:   
+    def __init__(self, url: str, excel_processor: ExcelProcessor, colorized_errors: ColorizedErrors, logger):
         self.url = url
-        self.excel_processor = ExcelProcessor(file_path)
-        self.colorized_errors = ColorizedErrors(file_path)
-        logging.basicConfig(level=logging.INFO)
-     
+        self.excel_processor = excel_processor
+        self.colorized_errors = colorized_errors   
+        self.logger = logger
     def get_web_table_rows(self, url):
         try:
             response = requests.get(url)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
-            table = soup.find('table')
-            if not table:
-                logging.warning("Таблица не найдена на веб-странице.")
-                return []
             
-            tbody = table.find('tbody')
+            tbody = soup.find_all('tr')
             if not tbody:
-                logging.warning("Тело таблицы не найдено на веб-странице.")
+                self.logger.warning("Строки таблицы не найдены на веб-странице.")
                 return []
             
-            return tbody.find_all('tr')
+            self.logger.info("Тело web-таблицы TTK найдено.")
+            
+            return tbody
         
         except requests.RequestException as e:
-            logging.error(f"Ошибка запроса: {e}")
-            return []   
-    
+            self.logger.error(f"Ошибка запроса: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Произошла ошибка: {e}")
+            return []    
+
     def compare_rows(self, excel_row, web_row):
         excel_data = excel_row[:3]
         
@@ -49,12 +47,12 @@ class WebParser:
         try:
             rows = self.excel_processor.read_sheet(sheet_name)
             if not rows:
-                logging.error(f"Не удалось прочитать данные из листа '{sheet_name}'.")
+                self.logger.error(f"Не удалось прочитать данные из листа '{sheet_name}'.")
                 return
             
             web_rows = self.get_web_table_rows(self.url)
             if not web_rows:
-                logging.warning("Нет строк для сравнения на веб-странице.")
+                self.logger.warning("Нет строк для сравнения на веб-странице.")
                 return
             
             rows_to_mark = []
@@ -62,21 +60,21 @@ class WebParser:
                 for web_row in web_rows:
                     if self.compare_rows(row, web_row):
                         rows_to_mark.append(i)
-                        logging.info(f"Совпадение найдено и будет удалено: {row[:13]}")
+                        self.logger.info(f"Совпадение найдено и будет удалено: {row[:13]}")
                         self.delete_row(row)
                         break
             else:
-                logging.info("Совпадений не найдено.")
+                self.logger.info("Совпадений не найдено.")
             
         except Exception as e:
-            logging.error(f"Произошла ошибка при проверке данных: {e}")
+            self.logger.error(f"Произошла ошибка при проверке данных: {e}")
 
     def delete_row(self, row):
         try:
             response = requests.post(f'{self.url}/delete.php', data={'value': row[0], 'delete': 'Delete'})
             response.raise_for_status()
-            logging.info(f'Строка c лицевым счетом {row[0]} удалена')
-            self.colorized_errors.mark_row(row, 'ccffcc')  # Передаём строку и цвет
+            self.logger.info(f'Строка c лицевым счетом {row[0]} удалена')
+            self.colorized_errors.mark_row(row, 'ccffcc')
         except requests.RequestException as e:
-            logging.error(f"Ошибка при удалении данных: {e}")
+            self.logger.error(f"Ошибка при удалении данных: {e}")
 
